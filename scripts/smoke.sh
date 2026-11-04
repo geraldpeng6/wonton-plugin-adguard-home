@@ -7,6 +7,8 @@
 #
 # WONTON_DEV_EGRESS_PROXY：给了就先把它配成核心的出口代理（插件冷启动要出网时用），不给就不配。
 set -uo pipefail
+# labels-test 支持当前清单规范；验证和冒烟不得回退到旧 beta 核心。
+export WONTON_CORE_IMAGE="${WONTON_CORE_IMAGE:-wonton-core:labels-test}" WONTON_PULL=never
 # shellcheck source=scripts/lib.sh
 . "$(dirname "$0")/lib.sh"
 
