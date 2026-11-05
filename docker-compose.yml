@@ -25,7 +25,7 @@ services:
       start_interval: 2s
     stop_grace_period: 30s
 
-  # configs 不能充当可写配置；只在首次复制，重建时移除旧应用账号，保留 DNS 设置。
+  # configs 不能充当可写配置；仅首次复制，保留已有配置不动。
   init:
     image: *image
     entrypoint: ["/bin/sh", "/init.sh"]

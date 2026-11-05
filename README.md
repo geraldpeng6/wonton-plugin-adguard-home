@@ -17,7 +17,6 @@ AdGuard Software Ltd. 所有，本插件不是 AdGuard 的官方合作、赞助�
 - `sso: none` 表示应用不接 OIDC 或代理身份头，网关仍校验主人会话；未登录不能访问网页及管理 API。
 
 `config/AdGuardHome.yaml` 预置上游配置以跳过首次向导；一次性 init 将它复制到可写数据目录，重装时不覆盖主人设置。
-从旧版升级时，init 只删除已有配置的 `users` 块，保留上游、过滤规则等设置；由固定版本的上游程序校验后再替换文件。
 
 ## 先跑起来
 
@@ -36,7 +35,7 @@ AdGuard Home 管理界面，不需要查找或输入第二份密码。
 | 路径 | 内容 |
 | --- | --- |
 | `docker-compose.yml` | AdGuard Home 服务、局域网 DNS 端口和 `x-wonton` 清单 |
-| `config/AdGuardHome.yaml`、`config/init.sh` | 首次配置和旧应用账号迁移；保留已有 DNS 设置 |
+| `config/AdGuardHome.yaml`、`config/init.sh` | 首次复制预置配置，不修改已有配置 |
 | `icon.svg` | AdGuard Home 官方 favicon |
 | `screenshots/` | 商店详情页截图 |
 | `scripts/check.sh` | 检查插件包 |
