@@ -12,11 +12,11 @@ services:
       - ${WONTON_APP_DATA}/config:/opt/adguardhome/conf
       - ${WONTON_APP_DATA}/work:/opt/adguardhome/work
     healthcheck:
-      # 网页登录页和本机 DNS 查询都必须可用；不把可变的 admin 密码绑定到健康状态。
+      # 网页 API 和本机 DNS 查询都必须可用；网页登录由核心网关负责。
       test:
         - CMD-SHELL
         - >-
-          wget -q -Y off -O /dev/null http://127.0.0.1:3000/login.html &&
+          wget -q -Y off -O /dev/null http://127.0.0.1:3000/control/status &&
           nslookup example.com 127.0.0.1 >/dev/null 2>&1
       interval: 30s
       timeout: 5s
@@ -25,25 +25,27 @@ services:
       start_interval: 2s
     stop_grace_period: 30s
 
-  # 首次创建时在本容器内跑上游安装向导 API；已有配置只校验，不覆盖主人设置。
+  # configs 不能充当可写配置；只在首次复制，重建时移除旧应用账号，保留 DNS 设置。
   init:
     image: *image
     entrypoint: ["/bin/sh", "/init.sh"]
-    environment:
-      WONTON_SECRET_ADMIN_PASSWORD: ${WONTON_SECRET_ADMIN_PASSWORD}
     volumes:
       - ${WONTON_APP_DATA}/config:/opt/adguardhome/conf
       - ${WONTON_APP_DATA}/work:/opt/adguardhome/work
     configs:
       - source: init
         target: /init.sh
-    # 安装 API 只访问本容器的 127.0.0.1，不给一次性服务出网或访问局域网的能力。
+      - source: defaults
+        target: /seed/AdGuardHome.yaml
+    # 初始化只写本地配置，不需要网络。
     network_mode: none
     restart: "no"
 
 configs:
   init:
     file: config/init.sh
+  defaults:
+    file: config/AdGuardHome.yaml
 
 x-wonton:
   spec: "0.4"
@@ -67,25 +69,23 @@ x-wonton:
     zh: |
       在家里的 DNS 层拦截广告、跟踪器和恶意域名。把路由器的 DNS 指向这台主机的局域网地址即可覆盖家里的设备。
 
-      插件只开放 53/tcp 和 53/udp，不启用 AdGuard Home 的 DHCP、DoH、DoT、DoQ 或 DNSCrypt 服务。网页仍在云吞网关登录后打开，应用自己的 admin 登录由核心生成的密码保护。
+      插件只开放 53/tcp 和 53/udp，不启用 AdGuard Home 的 DHCP、DoH、DoT、DoQ 或 DNSCrypt 服务。网页只经云吞网关登录后访问，直接进入管理界面；不设置应用账号，不发布 3000 网页端口。
     en: |
       Block ads, trackers, and malicious domains at home by pointing your router's DNS to this host's LAN address.
 
-      The plugin exposes only 53/tcp and 53/udp. AdGuard Home DHCP, DoH, DoT, DoQ, and DNSCrypt servers stay disabled. The web UI is behind the Wonton gateway and keeps AdGuard Home's own admin login with a core-generated password.
+      The plugin exposes only 53/tcp and 53/udp. AdGuard Home DHCP, DoH, DoT, DoQ, and DNSCrypt servers stay disabled. Sign in through the Wonton gateway to open the dashboard directly, without an application account. Web port 3000 is not published.
   release_notes:
-    zh: "首版：只提供局域网 DNS，预置过滤清单和 DoH 上游。"
-    en: "First release: LAN DNS only, with a default filter list and DoH upstream."
+    zh: "首版：只提供局域网 DNS，预置过滤清单和 DoH 上游；网页登录仅由云吞网关负责。"
+    en: "First release: LAN DNS only, with a default filter list and DoH upstream; web authentication is handled only by the Wonton gateway."
   webui:
     service: adguardhome
     port: 3000
+    # none 仍校验网关会话；应用不需要身份头或自己的登录。
     sso: none
   lan:
     ports:
       - { service: adguardhome, port: 53 }
       - { service: adguardhome, port: 53, protocol: udp }
-  secrets:
-    admin_password:
-      generate: { bytes: 32 }
   permissions:
     # 过滤清单更新和默认 DoH 上游需要访问外网；LAN DNS 端口由 network.lan 发布。
     - network.egress

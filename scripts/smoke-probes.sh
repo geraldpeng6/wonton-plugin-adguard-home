@@ -1,15 +1,9 @@
-# AdGuard Home：sso=none；应用自己的 admin 登录由 init 用核心生成的密码配置。
+# AdGuard Home 不设应用账号；主人身份只由网关会话验证。
 SSO=none
 MCP=0
 
 web_assert() {
   grep -qi 'apple-touch-icon-180x180.png'
-}
-
-container_env() {
-  local container="$1" name="$2"
-  docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$container" |
-    sed -n "s/^${name}=//p"
 }
 
 query_dns() {
@@ -96,29 +90,29 @@ probe_upstreams() {
 }
 
 identity_check() {
-  local container init_container password app_jar login status address udp tcp blocked_status blocked querylog clients
+  local container app_jar status anonymous page_code ports address udp tcp blocked_status blocked querylog path
   container="wonton-${SMOKE_INSTANCE}--${SMOKE_SLUG}--adguardhome"
-  init_container="wonton-${SMOKE_INSTANCE}--${SMOKE_SLUG}--init"
-  password="$(container_env "$init_container" WONTON_SECRET_ADMIN_PASSWORD)"
-  [[ -n "$password" ]] || { echo "init 容器里没有核心生成的 admin 密码"; return 1; }
-  app_jar="$SMOKE_DIR/adguardhome.cookies"
-  cp "$SMOKE_JAR" "$app_jar"
-  login="$(curl -sS --noproxy '*' --fail-with-body -b "$app_jar" -c "$app_jar" \
-    -X POST -H 'Content-Type: application/json' \
-    -d "{\"name\":\"admin\",\"password\":\"$password\"}" \
-    "$SMOKE_WEB_URL/control/login")" || {
-      echo "AdGuard Home admin 登录失败：$login"
-      return 1
-    }
-  [[ "$login" == *OK* ]] || { echo "AdGuard Home 登录没有返回 OK：$login"; return 1; }
+  app_jar="$SMOKE_JAR"
+  for path in / /control/status; do
+    anonymous="$(curl -sS --noproxy '*' -o /dev/null -w '%{http_code}' "$SMOKE_WEB_URL$path")" || return 1
+    [[ "$anonymous" == 401 ]] || { echo "网关未拒绝匿名请求 $path（HTTP $anonymous）"; return 1; }
+  done
+  page_code="$(curl -sS --noproxy '*' -b "$app_jar" -o /dev/null -w '%{http_code}' "$SMOKE_WEB_URL/")" || return 1
+  [[ "$page_code" == 200 ]] || { echo "主人会话未直接进入管理页（HTTP $page_code）"; return 1; }
   status="$(curl -sS --noproxy '*' --fail-with-body -b "$app_jar" "$SMOKE_WEB_URL/control/status")" || {
-    echo "AdGuard Home /control/status 失败"
+    echo '仅用网关会话访问管理 API 失败'
     return 1
   }
-  jq -e '.version != null and (.dns_addresses | length > 0)' >/dev/null <<<"$status" || {
-    echo "状态接口没有版本或 DNS 地址：$status"
+  jq -e '.running == true and (.dns_addresses | length > 0)' >/dev/null <<<"$status" || {
+    echo '管理 API 未报告 DNS 服务可用'
     return 1
   }
+  ports="$(docker inspect --format '{{json .HostConfig.PortBindings}}' "$container")" || return 1
+  jq -e 'keys | sort == ["53/tcp", "53/udp"]' >/dev/null <<<"$ports" || {
+    echo '发布端口不是仅 53/tcp 和 53/udp'
+    return 1
+  }
+  echo '网关认证通过：匿名网页/API 均 401；仅主人网关会话可直接使用管理页和 API；未发布 3000'
 
   address="$(docker inspect --format '{{json .NetworkSettings.Ports}}' "$container" |
     jq -r '."53/udp"[]?.HostIp // empty' |
@@ -127,8 +121,8 @@ identity_check() {
 
   udp="$(query_dns "$address" example.com udp)" || udp=""
   tcp="$(query_dns "$address" example.com tcp)" || tcp=""
-  [[ -n "$udp" ]] || { echo "53/udp 查询 example.com 失败（地址 $address，未改防火墙）"; return 1; }
-  [[ -n "$tcp" ]] || { echo "53/tcp 查询 example.com 失败（地址 $address，未改防火墙）"; return 1; }
+  [[ -n "$udp" ]] || { echo '宿主经 LAN 地址查询 53/udp 失败（未改防火墙）'; return 1; }
+  [[ -n "$tcp" ]] || { echo '宿主经 LAN 地址查询 53/tcp 失败（未改防火墙）'; return 1; }
 
   blocked_status=1
   blocked=
@@ -141,7 +135,7 @@ identity_check() {
     sleep 2
   done
   if [[ "$blocked_status" != 0 ]]; then
-    echo "53/udp 查询 doubleclick.net 失败（地址 $address，未改防火墙）"
+    echo '宿主经 LAN 地址查询 doubleclick.net 失败（未改防火墙）'
     return 1
   fi
   if ! grep -Eq '^(0\.0\.0\.0|::)$' <<<"$blocked"; then
@@ -152,7 +146,10 @@ identity_check() {
   probe_upstreams "$app_jar"
   sleep 1
   querylog="$(curl -sS --noproxy '*' --fail-with-body -b "$app_jar" \
-    "$SMOKE_WEB_URL/control/querylog?limit=20" 2>/dev/null || true)"
-  clients="$(jq -r '[.data[]?.client // empty] | join(",")' <<<"$querylog" 2>/dev/null || true)"
-  echo "局域网 DNS 查询通过：地址=$address udp=$udp tcp=$tcp；doubleclick=$blocked；querylog 客户端=$clients"
+    "$SMOKE_WEB_URL/control/querylog?limit=100")" || return 1
+  jq -e --arg client "$address" 'any(.data[]; .client == $client)' >/dev/null <<<"$querylog" || {
+    echo '查询日志未记录宿主的 LAN 来源地址'
+    return 1
+  }
+  echo 'DNS 通过：仅从宿主经 LAN 地址测试 53/udp、53/tcp；doubleclick.net 已拦截；日志保留宿主来源地址；其他 LAN 设备未测'
 }

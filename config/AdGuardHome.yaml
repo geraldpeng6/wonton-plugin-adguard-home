@@ -1,0 +1,14 @@
+# v0.107.80 的配置格式；未列出的字段沿用固定版本的上游默认值。
+schema_version: 34
+http:
+  address: 0.0.0.0:3000
+# 不设置 users：网关验证主人会话，应用内部不再登录。
+language: ""
+dns:
+  bind_hosts: [0.0.0.0]
+  port: 53
+  upstream_dns:
+    - https://dns.alidns.com/dns-query
+  bootstrap_dns:
+    - 223.5.5.5
+    - 2400:3200::1
