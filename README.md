@@ -1,60 +1,49 @@
-# 云吞插件模板
+# 云吞插件：AdGuard Home
 
-云吞（Wonton）的插件就是一个 `docker-compose.yml`，顶层多一个 `x-wonton` 字段，写明插件在云吞里的身份、网页入口和要的
-权限。一个插件一个 Git 仓库，仓库根目录就是插件包，发布就是打 tag。主人在 App 里装上插件，核心按清单起容器、接好登录，
-插件的网页在 App 里作为小程序打开。
+把 [AdGuard Home](https://github.com/AdguardTeam/AdGuardHome) 做成云吞插件：在局域网 DNS 层拦截广告、跟踪器和恶意域名。
+路由器把 DNS 指向这台主机的局域网地址后，家里的设备不需要逐台安装客户端。
 
-这个仓库是模板：一个能装上的示例插件（nginx 显示一个向主人问好的网页），加上检查、开发环境和发布三个脚本。从这个模板
-新建仓库，照着下面把示例换成你的应用。
+本插件只开放 `53/tcp` 和 `53/udp`，不启用 DHCP、DoH、DoT、DoQ 或 DNSCrypt 对外服务。网页仍在云吞网关登录后访问，
+应用不设置 `users`，不生成 admin 密码，打开即进入管理界面；3000 网页端口不发布到宿主或局域网。
 
-## 准备
+应用和官方图标采用 GPL-3.0-only 及 AdGuard 商标声明；来源、处理方式和许可证全文见 [NOTICE](NOTICE)。AdGuard 名称和标志归
+AdGuard Software Ltd. 所有，本插件不是 AdGuard 的官方合作、赞助或背书产品。
 
-- Docker Engine 28 或更新的版本，带 Compose 插件（`docker compose`）。Linux 上的 Docker Engine、macOS 上的 Docker Desktop 和
-  OrbStack 都行。
-- `git`、`curl`（7.76 或更新）、`python3`。
-- Docker 要在本机：开发环境的数据目录是这个仓库下的路径，网页也开在本机的端口上。在远程主机上开发见后面的
-  “在远程主机上开发”。
+## 插件行为
 
-不用装云吞，也不要 root：脚本用发布的核心镜像（`ghcr.io/geraldpeng6/wonton-core`）检查插件、起开发环境。
+- 默认语言留空，跟随浏览器；默认启用 AdGuard DNS filter。
+- 默认上游是阿里公共 DNS 的 DoH：`https://dns.alidns.com/dns-query`，bootstrap DNS 是 `223.5.5.5` 和 `2400:3200::1`。
+- `network.egress` 只给应用更新过滤清单、访问 DoH/DoT 上游；`network.lan` 只发布 DNS 端口。DHCP 不在插件范围内，用户自己在路由器上改 DNS。
+- `sso: none` 表示应用不接 OIDC 或代理身份头，网关仍校验主人会话；未登录不能访问网页及管理 API。
+
+`config/AdGuardHome.yaml` 预置上游配置以跳过首次向导；一次性 init 将它复制到可写数据目录，重装时不覆盖主人设置。
 
 ## 先跑起来
 
 ```bash
 scripts/dev.sh up
-```
-
-```bash
 scripts/dev.sh install
 ```
 
-`up` 在本机起一套云吞，打印它的地址。示例（实例名取自目录名加 4 位随机数，端口随机）是
-`http://template3f2a.wonton.localhost:21234/`。浏览器打开，用 `scripts/dev.sh token` 输出的主人令牌登录。`install` 先列出
-插件要的权限，确认后装上，打印插件网页的地址。
+`up` 后用 `scripts/dev.sh token` 输出的主人令牌登录核心，`install` 会显示插件要的高权限并安装它。网关登录后直接进入
+AdGuard Home 管理界面，不需要查找或输入第二份密码。
 
-示例网页经 `sso: proxy` 拿到用户名，打开就是“你好，<用户名>”。换成真实应用时，把示例的 `description`、`about`、`tags`
-换成你的，`web/`、compose 里的两个 `configs` 和 `sso: proxy` 及其 `proxy` 删掉（默认让应用自己登录），`webui.service`、
-`port` 换成你的，按下面的规则重写。Chrome、Firefox 和 curl 把 `*.localhost` 直接解析到本机，不用改 hosts。
+把路由器的 DNS 指向安装确认页显示的局域网地址。网页端口不是 LAN 端口，只有云吞网关能访问它。
 
 ## 仓库里有什么
 
 | 路径 | 内容 |
 | --- | --- |
-| `docker-compose.yml` | 插件本身：compose 加上 `x-wonton` 清单 |
-| `icon.svg`、`web/` | 清单和 compose 引用的文件：图标、交给容器的配置和网页 |
-| `screenshots/` | 商店详情页里的截图 |
-| `scripts/check.sh` | 检查插件包，规则和安装时一样 |
-| `scripts/dev.sh` | 开发环境：起一套云吞，装、重装、卸载插件，看日志 |
-| `scripts/smoke-probes.sh` | `scripts/dev.sh smoke` 对这个插件逐项的探测 |
-| `scripts/publish.sh` | 发布一个版本：打 tag、推送；`images/` 里有自己构建的镜像时先构建、推送并按摘要写回（示例没有） |
-| `AGENTS.md` | 给人和 AI 编程代理的规则 |
-| `LICENSE` | 插件包自己的许可证；从模板新建时换成作者自己的名字和年份 |
-| `NOTICE` | 图标等第三方素材的许可和声明；图标是自己画的就写原创和插件许可证，见第 10 步 |
-| `.wonton/` | 开发环境的设置、密钥和数据，不提交 |
+| `docker-compose.yml` | AdGuard Home 服务、局域网 DNS 端口和 `x-wonton` 清单 |
+| `config/AdGuardHome.yaml`、`config/init.sh` | 首次复制预置配置，不修改已有配置 |
+| `icon.svg` | AdGuard Home 官方 favicon |
+| `screenshots/` | 商店详情页截图 |
+| `scripts/check.sh` | 检查插件包 |
+| `scripts/dev.sh` | 起开发环境、安装、重装、卸载和查看日志 |
+| `scripts/smoke-probes.sh` | `scripts/dev.sh smoke` 的网关认证、网页和宿主 DNS 探测 |
+| `LICENSE`、`NOTICE` | 插件许可证、上游许可证和商标声明 |
 
-插件包是 `docker-compose.yml` 加上它引用的文件：`icon`、`settings`、`bot.avatar`、`notices` 和顶层 `configs` 的 `file`。README、
-截图、Dockerfile、源码都不在插件包里，核心不取。引用的路径相对仓库根目录，不能是绝对路径、不能含 `..`、不能用变量，
-也不能经过软链接；单个文件不超过 1 MiB，整个插件包不超过 2 MiB。安装时插件包以 tar 归档上传，归档里只能有普通文件和
-目录，最多 256 项。
+插件包只包含 `docker-compose.yml`、它引用的配置文件、`icon.svg` 和 `NOTICE`；README、截图和脚本不随包上传。
 
 ## 写插件
 

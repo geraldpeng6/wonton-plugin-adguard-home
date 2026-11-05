@@ -7,6 +7,8 @@
 #
 # WONTON_DEV_EGRESS_PROXY：给了就先把它配成核心的出口代理（插件冷启动要出网时用），不给就不配。
 set -uo pipefail
+# labels-test 支持当前清单规范；验证和冒烟不得回退到旧 beta 核心。
+export WONTON_CORE_IMAGE="${WONTON_CORE_IMAGE:-wonton-core:labels-test}" WONTON_PULL=never
 # shellcheck source=scripts/lib.sh
 . "$(dirname "$0")/lib.sh"
 
@@ -262,7 +264,7 @@ else
   elif ! declare -F identity_check >/dev/null; then
     fail 主人身份能用 "没写探测：在 scripts/smoke-probes.sh 里写 identity_check（调应用自己的当前用户接口，断言是主人管理员；没有用户体系就写 IDENTITY_NA=1）"
   elif identity_check >>"$LOG" 2>&1; then
-    pass 主人身份能用 "sso=$sso：应用认出主人 $SMOKE_OWNER（管理员）"
+    pass 主人身份能用 "sso=$sso：网关主人会话可直接访问管理界面与 API，匿名请求被拒绝"
   else
     fail 主人身份能用 "identity_check 失败，见 $LOG 末尾：$(tail -c 200 "$LOG" | tr '\n' ' ')"
   fi
