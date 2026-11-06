@@ -1,6 +1,5 @@
-# AdGuard Home 不设应用账号；主人身份只由网关会话验证。
-SSO=none
-MCP=0
+# shellcheck shell=bash
+# AdGuard Home 不设应用账号；身份只由网关会话验证。
 
 web_assert() {
   grep -qi 'apple-touch-icon-180x180.png'
