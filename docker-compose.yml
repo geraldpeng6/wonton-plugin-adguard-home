@@ -4,7 +4,7 @@ name: adguard-home
 services:
   adguardhome:
     # AdGuard 官方多架构镜像（amd64、arm64），v0.107.80，GPL-3.0-only。
-    image: &image adguard/adguardhome:v0.107.80@sha256:e2e1b48c832f7705be915873f95de0d5114de573736441d7f2923a8a6293027c
+    image: adguard/adguardhome:v0.107.80@sha256:e2e1b48c832f7705be915873f95de0d5114de573736441d7f2923a8a6293027c
     depends_on:
       init:
         condition: service_completed_successfully
@@ -27,7 +27,7 @@ services:
 
   # configs 不能充当可写配置；仅首次复制，保留已有配置不动。
   init:
-    image: *image
+    image: adguard/adguardhome:v0.107.80@sha256:e2e1b48c832f7705be915873f95de0d5114de573736441d7f2923a8a6293027c
     entrypoint: ["/bin/sh", "/init.sh"]
     volumes:
       - ${WONTON_APP_DATA}/config:/opt/adguardhome/conf
