@@ -89,6 +89,7 @@ probe_upstreams() {
 }
 
 identity_check() {
+  SMOKE_WEB_URL="${SMOKE_WEB_URL%/}"  # 套件给的地址带尾斜杠，拼路径前剥掉，避免 // 打不进路由
   local container app_jar status anonymous page_code ports address udp tcp blocked_status blocked querylog path
   container="wonton-${SMOKE_INSTANCE}--${SMOKE_SLUG}--adguardhome"
   app_jar="$SMOKE_JAR"
@@ -161,6 +162,7 @@ _agh_marker_file() { # 标记文件：SMOKE_STATE 在 dev.sh probes 里是目录
 }
 
 data_write() {
+  SMOKE_WEB_URL="${SMOKE_WEB_URL%/}"  # 套件给的地址带尾斜杠，拼路径前剥掉，避免 // 打不进路由
   local marker out
   marker="wonton-$(tr -dc a-z0-9 </dev/urandom | head -c 12).smoke.invalid"
   dweb --fresh / -L >/dev/null || { echo "重建网关会话失败"; return 1; }
@@ -172,6 +174,7 @@ data_write() {
 }
 
 data_check() {
+  SMOKE_WEB_URL="${SMOKE_WEB_URL%/}"  # 套件给的地址带尾斜杠，拼路径前剥掉，避免 // 打不进路由
   local marker out
   marker="$(cat "$(_agh_marker_file)" 2>/dev/null)" || true
   [[ -n "$marker" ]] || { echo "没有 data_write 留下的标记（SMOKE_STATE=${SMOKE_STATE:-未设置}）"; return 1; }
