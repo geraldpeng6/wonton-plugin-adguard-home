@@ -52,10 +52,10 @@ x-wonton:
   id: com.adguard.adguardhome
   version: 0.1.0
   kind: app
-  title: { zh: AdGuard Home, en: AdGuard Home }
+  title: { zh: 全屋去广告（AdGuard Home）, en: Whole-Home Ad Blocker (AdGuard Home) }
   description:
-    zh: 在局域网 DNS 层拦截广告和跟踪器
-    en: Block ads and trackers at the DNS layer for your home network
+    zh: 给全家的网络装一层广告过滤网：手机、电视、电脑上网页和 App 里的广告和跟踪自动挡掉。在路由器里设置一次，家里所有设备都受益。
+    en: "An ad filter for your whole home network: ads and trackers in web pages and apps are blocked on every phone, TV and computer. Set it up once on your router and every device benefits."
   icon: icon.svg
   notices: [NOTICE]
   screenshots: [screenshots/home.png]
@@ -67,11 +67,11 @@ x-wonton:
     en: [DNS, Ad blocking, Privacy]
   about:
     zh: |
-      在家里的 DNS 层拦截广告、跟踪器和恶意域名。把路由器的 DNS 指向这台主机的局域网地址即可覆盖家里的设备。
+      在家里网络的总入口拦截广告、跟踪器和恶意网站：把路由器的 DNS 改成家里服务器的地址，家里所有设备就都覆盖了。
 
       插件只开放 53/tcp 和 53/udp，不启用 AdGuard Home 的 DHCP、DoH、DoT、DoQ 或 DNSCrypt 服务。网页只经云吞网关登录后访问，直接进入管理界面；不设置应用账号，不发布 3000 网页端口。
     en: |
-      Block ads, trackers, and malicious domains at home by pointing your router's DNS to this host's LAN address.
+      Block ads, trackers and malicious sites at the entrance to your home network: set your router's DNS to your home server's address and every device in the house is covered.
 
       The plugin exposes only 53/tcp and 53/udp. AdGuard Home DHCP, DoH, DoT, DoQ, and DNSCrypt servers stay disabled. Sign in through the Wonton gateway to open the dashboard directly, without an application account. Web port 3000 is not published.
   release_notes:
