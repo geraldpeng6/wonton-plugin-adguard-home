@@ -1,6 +1,6 @@
 # 云吞插件：AdGuard Home
 
-开发流程见[插件开发指南](https://github.com/geraldpeng6/wonton-docs/blob/main/develop.md)。
+开发流程见[插件开发指南](https://github.com/wontonapp/wonton-docs/blob/main/develop.md)。
 
 把 [AdGuard Home](https://github.com/AdguardTeam/AdGuardHome) 做成云吞插件：在局域网 DNS 层拦截广告、跟踪器和恶意域名。
 路由器把 DNS 指向这台主机的局域网地址后，家里的设备不需要逐台安装客户端。
