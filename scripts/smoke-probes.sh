@@ -88,10 +88,20 @@ probe_upstreams() {
   done
 }
 
+_container() { # <服务名>：本实例里这个服务的容器。核心给插件容器打了 wonton.plugin / wonton.service / wonton.instance
+               # 标签，按标签找，不自己拼容器名。
+  local name
+  name="$(docker ps --format '{{.Names}}' \
+    --filter "label=wonton.plugin=$SMOKE_PLUGIN_ID" \
+    --filter "label=wonton.service=$1" \
+    --filter "label=wonton.instance=$SMOKE_INSTANCE" | head -1)"
+  [[ -n "$name" ]] || { echo "找不到 $SMOKE_PLUGIN_ID 的 $1 服务容器（实例 $SMOKE_INSTANCE）" >&2; return 1; }
+  printf '%s\n' "$name"
+}
+
 identity_check() {
-  SMOKE_WEB_URL="${SMOKE_WEB_URL%/}"  # 套件给的地址带尾斜杠，拼路径前剥掉，避免 // 打不进路由
   local container app_jar status anonymous page_code ports address udp tcp blocked_status blocked querylog path
-  container="wonton-${SMOKE_INSTANCE}--${SMOKE_SLUG}--adguardhome"
+  container="$(_container adguardhome)" || return 1
   app_jar="$SMOKE_JAR"
   for path in / /control/status; do
     anonymous="$(curl -sS --noproxy '*' -o /dev/null -w '%{http_code}' "$SMOKE_WEB_URL$path")" || return 1
@@ -157,27 +167,21 @@ identity_check() {
 # 数据：过滤配置和查询日志都在 ${WONTON_APP_DATA}（docker-compose.yml 的 config、work 卷）。
 # data_write 走应用自己的控制 API 加一条 DNS 重写（唯一子域 → 192.0.2.10 文档地址），域名记进 SMOKE_STATE；
 # data_check 在升级、重装后从重写列表读回比对。升级和重装会重建核心，会话要重建（beszel 同款做法）。
-_agh_marker_file() { # 标记文件：SMOKE_STATE 在 dev.sh probes 里是目录，目录里放标记文件
-  if [[ -d "${SMOKE_STATE:-}" ]]; then printf '%s/data-marker' "$SMOKE_STATE"; else printf '%s' "${SMOKE_STATE:-}"; fi
-}
-
 data_write() {
-  SMOKE_WEB_URL="${SMOKE_WEB_URL%/}"  # 套件给的地址带尾斜杠，拼路径前剥掉，避免 // 打不进路由
   local marker out
   marker="wonton-$(tr -dc a-z0-9 </dev/urandom | head -c 12).smoke.invalid"
   dweb --fresh / -L >/dev/null || { echo "重建网关会话失败"; return 1; }
   out="$(curl -sS --noproxy '*' --fail-with-body -b "$SMOKE_JAR" -X POST -H 'Content-Type: application/json' \
     --data "$(jq -nc --arg d "$marker" '{domain:$d,answer:"192.0.2.10"}')" \
     "$SMOKE_WEB_URL/control/rewrite/add")" || { echo "加重写失败：$out"; return 1; }
-  printf '%s' "$marker" >"$(_agh_marker_file)" || { echo "写不进标记文件 $(_agh_marker_file)"; return 1; }
+  printf '%s' "$marker" >"$SMOKE_STATE" || { echo "写不进标记文件 $SMOKE_STATE"; return 1; }
   echo "已加重写 $marker → 192.0.2.10"
 }
 
 data_check() {
-  SMOKE_WEB_URL="${SMOKE_WEB_URL%/}"  # 套件给的地址带尾斜杠，拼路径前剥掉，避免 // 打不进路由
   local marker out
-  marker="$(cat "$(_agh_marker_file)" 2>/dev/null)" || true
-  [[ -n "$marker" ]] || { echo "没有 data_write 留下的标记（SMOKE_STATE=${SMOKE_STATE:-未设置}）"; return 1; }
+  marker="$(cat "$SMOKE_STATE" 2>/dev/null)" || true
+  [[ -n "$marker" ]] || { echo "没有 data_write 留下的标记（SMOKE_STATE=$SMOKE_STATE）"; return 1; }
   dweb --fresh / -L >/dev/null || { echo "重建网关会话失败"; return 1; }
   out="$(curl -sS --noproxy '*' --fail-with-body -b "$SMOKE_JAR" "$SMOKE_WEB_URL/control/rewrite/list")" ||
     { echo "读重写列表失败：$out"; return 1; }
