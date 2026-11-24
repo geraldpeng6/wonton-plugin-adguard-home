@@ -3,7 +3,7 @@ name: adguard-home
 
 services:
   adguardhome:
-    # AdGuard 官方多架构镜像（amd64、arm64），v0.107.80，GPL-3.0-only。
+    # AdGuard 官方多架构镜像（amd64、arm64），v1.0.0，GPL-3.0-only。
     image: adguard/adguardhome:v1.0.0@sha256:f00a586f0d1caa74f149340bfb225014960310488ffa838406b89256900a96c2
     depends_on:
       init:
