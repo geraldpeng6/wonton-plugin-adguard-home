@@ -2,7 +2,7 @@
 # AdGuard Home 不设应用账号；身份只由网关会话验证。
 
 web_assert() {
-  grep -qi 'apple-touch-icon-180x180.png'
+  grep -qi apple-touch-icon
 }
 
 query_dns() {
